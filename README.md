@@ -1,4 +1,4 @@
-# V3 — Spec-Driven Autonomous SDLC/ADLC Engine
+# Spec-Driven Autonomous SDLC/ADLC Engine
 
 An autonomous pipeline where AI handles the entire software lifecycle end-to-end: generating specs, indexing them, executing full "one-shot" app builds, scanning bugs, auto-fixing bugs, and processing whole-feature additions.
 
@@ -6,7 +6,7 @@ An autonomous pipeline where AI handles the entire software lifecycle end-to-end
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    V3 ADLC Engine                            │
+│                    ADLC Engine                                │
 ├─────────────┬──────────────┬──────────────┬─────────────────┤
 │   Spec Gen  │  One-Shot    │  Bug Scan &  │  Notification   │
 │   Agent     │  Builder     │  Auto-Fix    │  Digest         │
