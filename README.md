@@ -17,6 +17,18 @@ An autonomous pipeline where AI handles the entire software lifecycle end-to-end
 ├─────────────────────────────────────────────────────────────┤
 │              Centralized Spec Directory                      │
 └─────────────────────────────────────────────────────────────┘
+         ▲                    ▲
+         │ CLI                │ Web UI
+    ┌────┴────┐         ┌────┴────┐
+    │Commander│         │ Express │
+    │  CLI    │         │  API    │
+    └─────────┘         └────┬────┘
+                             │
+                        ┌────┴────┐
+                        │  React  │
+                        │  + Vite │
+                        │  + TW   │
+                        └─────────┘
 ```
 
 ## Quick Start
@@ -24,6 +36,11 @@ An autonomous pipeline where AI handles the entire software lifecycle end-to-end
 ```bash
 # Install dependencies
 npm install
+
+# Install frontend dependencies
+cd web && npm install && cd ..
+
+# ─── CLI Mode ─────────────────────────────────────────────
 
 # Generate a spec from a product idea
 npm run spec:generate -- --prompt="A real-time trading dashboard"
@@ -45,6 +62,19 @@ npm run bug:fix
 
 # Generate notification digest
 npm run notify:digest
+
+# ─── Web UI Mode ─────────────────────────────────────────
+
+# Start both API server + React dev server (hot-reload)
+npm run dev
+
+# Or start them separately:
+npm run dev:server   # API server on http://localhost:3000
+npm run dev:ui       # React dev server on http://localhost:5173
+
+# Production build
+npm run build:ui     # Build React app
+npm run start        # Start Express serving built frontend
 ```
 
 ## Core Principles
@@ -67,4 +97,21 @@ npm run notify:digest
 | `/src/notifications` | Log digest & Slack integration |
 | `/src/schemas` | JSON Schema validators |
 | `/src/utils` | Shared utilities |
+| `/src/server` | Express API server (routes, middleware) |
+| `/web` | React + Vite + Tailwind frontend |
 | `/tests` | Unit & integration tests |
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/health` | Health check |
+| `POST` | `/api/specs/generate` | Generate spec from prompt |
+| `GET` | `/api/specs` | List all specs |
+| `GET` | `/api/specs/:name` | Get spec content |
+| `POST` | `/api/build/oneshot` | One-shot build |
+| `POST` | `/api/features/add` | Add feature to spec |
+| `POST` | `/api/bugs/scan` | Scan for bugs |
+| `POST` | `/api/bugs/fix` | Auto-fix a bug |
+| `GET` | `/api/audit` | Run spec coverage audit |
+| `GET` | `/api/notifications/digest` | Get notification digest |

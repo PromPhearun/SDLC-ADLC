@@ -35,3 +35,7 @@ temp/
 
 # Generated artifacts
 specs-directory.json
+
+# Frontend
+web/node_modules/
+web/dist/
