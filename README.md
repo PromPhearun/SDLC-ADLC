@@ -103,15 +103,32 @@ npm run start        # Start Express serving built frontend
 
 ## API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/health` | Health check |
-| `POST` | `/api/specs/generate` | Generate spec from prompt |
-| `GET` | `/api/specs` | List all specs |
-| `GET` | `/api/specs/:name` | Get spec content |
-| `POST` | `/api/build/oneshot` | One-shot build |
-| `POST` | `/api/features/add` | Add feature to spec |
-| `POST` | `/api/bugs/scan` | Scan for bugs |
-| `POST` | `/api/bugs/fix` | Auto-fix a bug |
-| `GET` | `/api/audit` | Run spec coverage audit |
-| `GET` | `/api/notifications/digest` | Get notification digest |
+| Method | Endpoint | Description | Response |
+|--------|----------|-------------|----------|
+| `GET` | `/api/health` | Health check | JSON |
+| `POST` | `/api/specs/generate` | Generate spec from prompt | SSE stream |
+| `GET` | `/api/specs` | List all specs | JSON |
+| `GET` | `/api/specs/:name` | Get spec content | JSON |
+| `POST` | `/api/build/oneshot` | One-shot build | SSE stream |
+| `POST` | `/api/features/add` | Add feature to spec | JSON |
+| `POST` | `/api/bugs/scan` | Scan for bugs | JSON |
+| `POST` | `/api/bugs/fix` | Auto-fix a bug | JSON |
+| `GET` | `/api/audit` | Run spec coverage audit | JSON |
+| `GET` | `/api/notifications/digest` | Get notification digest | JSON |
+
+### Real-Time Progress Streaming
+
+The Spec Generator and One-Shot Builder endpoints use **Server-Sent Events (SSE)** to stream real-time progress updates to the client.
+
+**Spec Generator** (`POST /api/specs/generate`) emits:
+- `progress` — step-by-step updates (template loading → prompt analysis → content generation → file writing → finalization)
+- `result` — final spec metadata (project name, version, user story count, API endpoint count, section count, output path, spec preview)
+- `done` — stream completion signal
+
+**One-Shot Builder** (`POST /api/build/oneshot`) emits:
+- `progress` — pipeline stage updates (validate-spec → parse-spec → generate-scaffold → generate-code)
+- `stage-complete` — per-stage completion with success/failure status and duration in ms
+- `result` — final build output (files generated, iterations, test status, pipeline summary)
+- `done` — stream completion signal
+
+Both endpoints also emit `error` events if something goes wrong mid-stream.

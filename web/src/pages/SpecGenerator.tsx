@@ -1,14 +1,31 @@
 import { useState } from "react";
-import { api, SpecMetadata } from "../api/client";
+import { streamRequest, SpecMetadata } from "../api/client";
+
+interface ProgressEvent {
+  step: number;
+  totalSteps: number;
+  label: string;
+  percent: number;
+}
+
+const STEPS = [
+  "Loading spec template...",
+  "Analyzing product description...",
+  "Generating spec content...",
+  "Writing spec to disk...",
+  "Finalizing...",
+];
 
 export default function SpecGenerator() {
   const [prompt, setPrompt] = useState("");
   const [projectName, setProjectName] = useState("");
   const [constraints, setConstraints] = useState("");
   const [dryRun, setDryRun] = useState(false);
-  const [result, setResult] = useState<SpecMetadata | null>(null);
+  const [result, setResult] = useState<SpecMetadata & { outputPath?: string; specPreview?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [progress, setProgress] = useState<ProgressEvent | null>(null);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -17,9 +34,11 @@ export default function SpecGenerator() {
     setLoading(true);
     setError("");
     setResult(null);
+    setProgress(null);
+    setCompletedSteps([]);
 
     try {
-      const res = await api.generateSpec({
+      const stream = await streamRequest("/specs/generate", {
         prompt: prompt.trim(),
         projectName: projectName.trim() || undefined,
         constraints: constraints.trim()
@@ -27,15 +46,37 @@ export default function SpecGenerator() {
           : undefined,
         dryRun,
       });
-      if (res.success && res.data) {
-        setResult(res.data as unknown as SpecMetadata);
-      } else {
-        setError(res.errors?.join(", ") || "Spec generation failed");
+
+      for await (const { event, data } of stream) {
+        if (event === "progress") {
+          const p = data as ProgressEvent;
+          setProgress(p);
+          if (p.step > 0) {
+            setCompletedSteps((prev) => {
+              const next = [...prev];
+              for (let i = 1; i < p.step; i++) {
+                if (!next.includes(i)) next.push(i);
+              }
+              return next;
+            });
+          }
+        } else if (event === "result") {
+          const res = data as { success: boolean; data: (SpecMetadata & { outputPath?: string; specPreview?: string }) | null; errors?: string[] };
+          if (res.success && res.data) {
+            setResult(res.data);
+            setCompletedSteps([1, 2, 3, 4, 5]);
+          } else {
+            setError(res.errors?.join(", ") || "Spec generation failed");
+          }
+        } else if (event === "error") {
+          setError((data as { error: string }).error);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
     } finally {
       setLoading(false);
+      setProgress(null);
     }
   }
 
@@ -110,6 +151,54 @@ export default function SpecGenerator() {
         </button>
       </form>
 
+      {/* Progress Stepper */}
+      {loading && progress && (
+        <div className="mt-6 bg-white border border-slate-200 rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-slate-800">Generating Spec</h2>
+            <span className="text-sm font-medium text-brand-600">{progress.percent}%</span>
+          </div>
+          <div className="w-full bg-slate-100 rounded-full h-2 mb-6">
+            <div
+              className="bg-brand-600 h-2 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${progress.percent}%` }}
+            />
+          </div>
+          <div className="space-y-3">
+            {STEPS.map((stepLabel, i) => {
+              const stepNum = i + 1;
+              const isCompleted = completedSteps.includes(stepNum);
+              const isCurrent = progress.step === stepNum;
+              return (
+                <div key={stepNum} className="flex items-center gap-3">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 ${
+                    isCompleted ? "bg-green-500 text-white"
+                      : isCurrent ? "bg-brand-600 text-white animate-pulse"
+                      : "bg-slate-200 text-slate-500"
+                  }`}>
+                    {isCompleted ? "✓" : stepNum}
+                  </div>
+                  <span className={`text-sm ${
+                    isCompleted ? "text-green-700 font-medium"
+                      : isCurrent ? "text-slate-800 font-medium"
+                      : "text-slate-400"
+                  }`}>
+                    {stepLabel}
+                  </span>
+                  {isCurrent && (
+                    <div className="flex gap-1 ml-auto">
+                      <div className="w-1.5 h-1.5 bg-brand-600 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <div className="w-1.5 h-1.5 bg-brand-600 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <div className="w-1.5 h-1.5 bg-brand-600 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
           ❌ {error}
@@ -118,18 +207,24 @@ export default function SpecGenerator() {
 
       {result && (
         <div className="mt-6 bg-white border border-slate-200 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">
-            ✅ Spec Generated
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">✅ Spec Generated Successfully</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <InfoItem label="Project" value={result.projectName} />
             <InfoItem label="Version" value={result.version} />
             <InfoItem label="Sections" value={String(result.sectionCount)} />
-            <InfoItem
-              label="User Stories"
-              value={String(result.userStoryCount)}
-            />
+            <InfoItem label="User Stories" value={String(result.userStoryCount)} />
           </div>
+          {result.outputPath && <InfoItem label="Output Path" value={result.outputPath} />}
+          {result.specPreview && (
+            <details className="mt-4">
+              <summary className="text-sm font-medium text-slate-600 cursor-pointer hover:text-slate-800">
+                📄 Preview spec content
+              </summary>
+              <pre className="mt-2 p-4 bg-slate-50 rounded-lg text-xs text-slate-700 overflow-auto max-h-64 whitespace-pre-wrap">
+                {result.specPreview}
+              </pre>
+            </details>
+          )}
         </div>
       )}
     </div>
@@ -140,7 +235,7 @@ function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-xs text-slate-500">{label}</p>
-      <p className="text-sm font-medium text-slate-800">{value}</p>
+      <p className="text-sm font-medium text-slate-800 break-all">{value}</p>
     </div>
   );
 }

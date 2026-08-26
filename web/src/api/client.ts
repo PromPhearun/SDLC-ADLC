@@ -15,6 +15,78 @@ async function request<T>(
   return data as T;
 }
 
+/**
+ * Parse SSE events from a streaming fetch response.
+ * Yields { event, data } for each event received.
+ */
+async function* parseSSEStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>
+): AsyncGenerator<{ event: string; data: unknown }> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let currentEvent = "";
+  let currentData = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (line.startsWith("event: ")) {
+        currentEvent = line.slice(7).trim();
+      } else if (line.startsWith("data: ")) {
+        currentData = line.slice(6).trim();
+      } else if (line === "" && currentEvent) {
+        try {
+          yield { event: currentEvent, data: JSON.parse(currentData) };
+        } catch {
+          yield { event: currentEvent, data: currentData };
+        }
+        currentEvent = "";
+        currentData = "";
+      }
+    }
+  }
+
+  // Flush remaining buffer
+  if (currentEvent && currentData) {
+    try {
+      yield { event: currentEvent, data: JSON.parse(currentData) };
+    } catch {
+      yield { event: currentEvent, data: currentData };
+    }
+  }
+}
+
+/**
+ * Make a streaming POST request and return an async generator of SSE events.
+ */
+export async function streamRequest(
+  path: string,
+  body: unknown
+): Promise<AsyncGenerator<{ event: string; data: unknown }>> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: `Request failed: ${res.status}` }));
+    throw new Error(data.error || `Request failed: ${res.status}`);
+  }
+
+  if (!res.body) {
+    throw new Error("Response body is null — streaming not supported");
+  }
+
+  return parseSSEStream(res.body.getReader());
+}
+
 // ─── Types ──────────────────────────────────────────────────
 
 export interface ApiResponse<T> {

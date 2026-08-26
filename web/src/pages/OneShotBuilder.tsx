@@ -1,5 +1,13 @@
 import { useState, useEffect } from "react";
-import { api, SpecsDirectory, BuildResult, PipelineStage } from "../api/client";
+import { api, streamRequest, SpecsDirectory, BuildResult, PipelineStage } from "../api/client";
+
+interface ProgressEvent {
+  step: number;
+  totalSteps: number;
+  stage: string;
+  label: string;
+  percent: number;
+}
 
 export default function OneShotBuilder() {
   const [specs, setSpecs] = useState<SpecsDirectory | null>(null);
@@ -10,6 +18,7 @@ export default function OneShotBuilder() {
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [progress, setProgress] = useState<ProgressEvent | null>(null);
 
   useEffect(() => {
     api.listSpecs().then((res) => { if (res.success) setSpecs(res.data); }).catch(() => {});
@@ -22,19 +31,46 @@ export default function OneShotBuilder() {
     setError("");
     setResult(null);
     setStages([]);
+    setProgress(null);
+
     try {
-      const res = await api.runBuild({ specPath, outputDir, mode });
-      if (res.success) {
-        setResult(res.data);
-        setStages(res.pipeline.stages);
-      } else {
-        setError(res.pipeline.errors.join(", ") || "Build failed");
-        setStages(res.pipeline.stages);
+      const stream = await streamRequest("/build/oneshot", { specPath, outputDir, mode });
+
+      for await (const { event, data } of stream) {
+        if (event === "progress") {
+          setProgress(data as ProgressEvent);
+        } else if (event === "stage-complete") {
+          const sc = data as { stage: string; success: boolean; duration: number; error?: string };
+          setStages((prev) => {
+            const existing = prev.findIndex((s) => s.stage === sc.stage);
+            if (existing >= 0) {
+              const next = [...prev];
+              next[existing] = sc;
+              return next;
+            }
+            return [...prev, sc];
+          });
+        } else if (event === "result") {
+          const res = data as {
+            success: boolean;
+            data: BuildResult | null;
+            pipeline: { stages: PipelineStage[]; totalDuration: number; errors: string[] };
+          };
+          if (res.success && res.data) {
+            setResult(res.data);
+          } else {
+            setError(res.pipeline.errors.join(", ") || "Build failed");
+          }
+          setStages(res.pipeline.stages);
+        } else if (event === "error") {
+          setError((data as { error: string }).error);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
     } finally {
       setLoading(false);
+      setProgress(null);
     }
   }
 
@@ -43,7 +79,27 @@ export default function OneShotBuilder() {
       <h1 className="text-2xl font-bold text-slate-900 mb-2">One-Shot Builder</h1>
       <p className="text-slate-500 mb-6">Generate a full application from a spec file in one shot.</p>
       <BuildForm {...{ specPath, setSpecPath, outputDir, setOutputDir, mode, setMode, loading, specs, handleSubmit }} />
+
+      {/* Real-time progress */}
+      {loading && progress && (
+        <div className="mt-6 bg-white border border-slate-200 rounded-xl p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-slate-800">Building Application</h2>
+            <span className="text-sm font-medium text-brand-600">{progress.percent}%</span>
+          </div>
+          <div className="w-full bg-slate-100 rounded-full h-2 mb-4">
+            <div className="bg-brand-600 h-2 rounded-full transition-all duration-500 ease-out" style={{ width: `${progress.percent}%` }} />
+          </div>
+          <p className="text-sm text-slate-600">
+            <span className="inline-block w-4 h-4 border-2 border-brand-600 border-t-transparent rounded-full animate-spin mr-2 align-middle" />
+            {progress.label}
+          </p>
+        </div>
+      )}
+
+      {/* Pipeline stages — shown as they complete */}
       {stages.length > 0 && <PipelineStages stages={stages} />}
+
       {error && <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">❌ {error}</div>}
       {result && <BuildResultPanel result={result} />}
     </div>
