@@ -7,6 +7,8 @@ import {
 import { config } from "../config";
 import { readFileSafe, findFiles } from "../utils/file-io";
 import { createContextLogger } from "../utils/logger";
+import { generateFromPrompts } from "../services/ai-client";
+import { BUG_ANALYSIS_SYSTEM, buildBugAnalysisPrompt } from "../services/prompts/bug-analysis";
 
 const log = createContextLogger("bug-scanner");
 
@@ -33,6 +35,11 @@ export class BugScannerAgent implements Agent<BugScannerInput, BugScannerOutput>
       if (scanTypes.includes("tests")) bugs.push(...await this.runTestSuite(input.scanPath));
       if (scanTypes.includes("logs")) bugs.push(...await this.parseLogs(input.scanPath));
       if (input.specPath) bugs.push(...await this.validateAgainstSpec(input.scanPath, input.specPath));
+
+      // AI-powered deep analysis
+      if (config.ai.apiKey) {
+        bugs.push(...await this.runAIAnalysis(input.scanPath, input.specPath));
+      }
 
       const summary = {
         critical: bugs.filter((b) => b.severity === "critical").length,
@@ -191,6 +198,59 @@ export class BugScannerAgent implements Agent<BugScannerInput, BugScannerOutput>
         suggestion: "Fix the TypeScript compilation error",
       });
     }
+    return bugs;
+  }
+
+  /**
+   * AI-powered deep code analysis.
+   * Analyzes key source files for bugs, security issues, and logic errors.
+   */
+  private async runAIAnalysis(scanPath: string, specPath?: string): Promise<BugReport[]> {
+    const bugs: BugReport[] = [];
+    const sourceFiles = findFiles(scanPath, ".ts", 5).slice(0, 10); // Limit to 10 files
+
+    let specContext: string | undefined;
+    if (specPath) {
+      specContext = readFileSafe(specPath)?.substring(0, 1000);
+    }
+
+    for (const file of sourceFiles) {
+      const content = readFileSafe(file);
+      if (!content || content.length < 50) continue;
+
+      const relPath = path.relative(scanPath, file);
+
+      try {
+        log.info("AI analyzing file", { file: relPath });
+        const prompt = buildBugAnalysisPrompt(content, relPath, specContext);
+        const result = await generateFromPrompts(BUG_ANALYSIS_SYSTEM, prompt, {
+          temperature: config.ai.bugFixTemperature,
+          maxTokens: 2000,
+        });
+
+        // Parse AI response as JSON array
+        let aiBugs: BugReport[] = [];
+        try {
+          let jsonContent = result.content.trim();
+          if (jsonContent.startsWith("```json")) jsonContent = jsonContent.slice(7);
+          if (jsonContent.startsWith("```")) jsonContent = jsonContent.slice(3);
+          if (jsonContent.endsWith("```")) jsonContent = jsonContent.slice(0, -3);
+          jsonContent = jsonContent.trim();
+
+          aiBugs = JSON.parse(jsonContent);
+        } catch {
+          log.warn("Failed to parse AI bug analysis response", { file: relPath });
+        }
+
+        bugs.push(...aiBugs);
+      } catch (error) {
+        log.warn("AI analysis failed for file", {
+          file: relPath,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     return bugs;
   }
 }

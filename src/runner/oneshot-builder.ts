@@ -21,6 +21,8 @@ import {
   OneshotBuilderInput,
   OneshotBuilderOutput,
 } from "../agents/types";
+import { CodeGeneratorAgent } from "../agents/code-generator";
+import { config } from "../config";
 
 const log = createContextLogger("oneshot-builder");
 
@@ -106,13 +108,38 @@ const generateScaffold = createStage<
 
 const generateCode = createStage<{ files: string[] }, OneshotBuilderOutput>(
   "generate-code",
-  "Generate application code from spec",
+  "Generate application code from spec using AI",
   async (input, ctx) => {
     const specContent = readFileSafe(ctx.specPath) || "";
     const userStoryCount = countUserStories(specContent);
     const apiEndpointCount = countApiEndpoints(specContent);
     const generatedFiles = [...input.files];
 
+    // Use AI-powered code generator if API key is available
+    if (config.ai.apiKey) {
+      log.info("Using AI-powered code generation", { model: config.ai.model });
+
+      const codeGenerator = new CodeGeneratorAgent();
+      const result = await codeGenerator.execute(ctx.specPath, {
+        workingDir: ctx.outputDir,
+        dryRun: ctx.dryRun,
+      });
+
+      if (result.success && result.data) {
+        log.info("AI code generation successful", {
+          filesGenerated: result.data.filesGenerated.length,
+          duration: result.duration,
+        });
+        return result.data;
+      }
+
+      log.warn("AI code generation failed, falling back to scaffold", {
+        errors: result.errors,
+      });
+    }
+
+    // Fallback: generate basic scaffold
+    log.info("Using scaffold-based code generation");
     if (apiEndpointCount > 0) {
       const routesPath = path.join(ctx.outputDir, "src", "routes", "index.ts");
       if (!ctx.dryRun) {

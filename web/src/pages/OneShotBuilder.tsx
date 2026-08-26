@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { api, streamRequest, SpecsDirectory, BuildResult, PipelineStage } from "../api/client";
+import CodePreview from "../components/CodePreview";
+import BuildLogs from "../components/BuildLogs";
 
 interface ProgressEvent {
   step: number;
@@ -7,6 +9,13 @@ interface ProgressEvent {
   stage: string;
   label: string;
   percent: number;
+}
+
+interface LogEntry {
+  timestamp: string;
+  level: "info" | "warn" | "error" | "debug";
+  message: string;
+  data?: Record<string, unknown>;
 }
 
 export default function OneShotBuilder() {
@@ -19,6 +28,7 @@ export default function OneShotBuilder() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
 
   useEffect(() => {
     api.listSpecs().then((res) => { if (res.success) setSpecs(res.data); }).catch(() => {});
@@ -32,6 +42,7 @@ export default function OneShotBuilder() {
     setResult(null);
     setStages([]);
     setProgress(null);
+    setLogs([]);
 
     try {
       const stream = await streamRequest("/build/oneshot", { specPath, outputDir, mode });
@@ -39,6 +50,11 @@ export default function OneShotBuilder() {
       for await (const { event, data } of stream) {
         if (event === "progress") {
           setProgress(data as ProgressEvent);
+          setLogs((prev) => [...prev, {
+            timestamp: new Date().toISOString(),
+            level: "info",
+            message: (data as ProgressEvent).label,
+          }]);
         } else if (event === "stage-complete") {
           const sc = data as { stage: string; success: boolean; duration: number; error?: string };
           setStages((prev) => {
@@ -50,6 +66,12 @@ export default function OneShotBuilder() {
             }
             return [...prev, sc];
           });
+          setLogs((prev) => [...prev, {
+            timestamp: new Date().toISOString(),
+            level: sc.success ? "info" : "error",
+            message: `Stage ${sc.stage}: ${sc.success ? "completed" : "failed"} (${sc.duration}ms)`,
+            data: sc.error ? { error: sc.error } : undefined,
+          }]);
         } else if (event === "result") {
           const res = data as {
             success: boolean;
@@ -64,6 +86,11 @@ export default function OneShotBuilder() {
           setStages(res.pipeline.stages);
         } else if (event === "error") {
           setError((data as { error: string }).error);
+          setLogs((prev) => [...prev, {
+            timestamp: new Date().toISOString(),
+            level: "error",
+            message: (data as { error: string }).error,
+          }]);
         }
       }
     } catch (err) {
@@ -99,6 +126,11 @@ export default function OneShotBuilder() {
 
       {/* Pipeline stages — shown as they complete */}
       {stages.length > 0 && <PipelineStages stages={stages} />}
+
+      {/* Build Logs */}
+      <div className="mt-6">
+        <BuildLogs logs={logs} isStreaming={loading} />
+      </div>
 
       {error && <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">❌ {error}</div>}
       {result && <BuildResultPanel result={result} />}
@@ -172,11 +204,19 @@ function BuildResultPanel({ result }: { result: BuildResult }) {
   return (
     <div className="mt-6 bg-white border border-slate-200 rounded-xl p-6">
       <h2 className="text-lg font-semibold text-slate-800 mb-4">✅ Build Complete</h2>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4 mb-6">
         <div><p className="text-xs text-slate-500">Files Generated</p><p className="text-lg font-bold text-slate-800">{result.filesGenerated.length}</p></div>
         <div><p className="text-xs text-slate-500">Iterations</p><p className="text-lg font-bold text-slate-800">{result.iterations}</p></div>
         <div><p className="text-xs text-slate-500">Tests Passing</p><p className="text-lg font-bold text-slate-800">{result.testsPassing ? "✅ Yes" : "❌ No"}</p></div>
       </div>
+
+      {/* Code Preview */}
+      {result.filesGenerated.length > 0 && (
+        <div className="mt-4">
+          <h3 className="text-md font-semibold text-slate-700 mb-3">Generated Code Preview</h3>
+          <CodePreview files={result.filesGenerated} />
+        </div>
+      )}
     </div>
   );
 }

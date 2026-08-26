@@ -6,6 +6,9 @@ import { extractTitle, extractMeta, validateSections } from "../utils/markdown";
 import { SPEC_REQUIRED_SECTIONS } from "../schemas/spec.schema";
 import { runOneshotBuild } from "./oneshot-builder";
 import { FeatureAddInput } from "../agents/types";
+import { config } from "../config";
+import { generateFromPrompts } from "../services/ai-client";
+import { FEATURE_SPEC_UPDATE_SYSTEM, buildFeatureSpecUpdatePrompt } from "../services/prompts/feature-addition";
 
 const log = createContextLogger("feature-add");
 
@@ -38,7 +41,7 @@ export async function runFeatureAdd(input: FeatureAddInput): Promise<void> {
   log.info("Current spec loaded", { projectName, version: currentVersion });
 
   // Step 2: Update spec with new feature
-  const updatedSpec = updateSpecWithFeature(existingSpec, input.featurePrompt, currentVersion);
+  const updatedSpec = await updateSpecWithFeature(existingSpec, input.featurePrompt, currentVersion);
 
   // Step 3: Validate updated spec
   const updatedValidation = validateSections(updatedSpec, [...SPEC_REQUIRED_SECTIONS]);
@@ -88,8 +91,47 @@ export async function runFeatureAdd(input: FeatureAddInput): Promise<void> {
 
 /**
  * Update an existing spec with a new feature description.
+ * Uses AI if available, falls back to rule-based update.
  */
-function updateSpecWithFeature(
+async function updateSpecWithFeature(
+  existingSpec: string,
+  featurePrompt: string,
+  currentVersion: string
+): Promise<string> {
+  // Try AI-powered update first
+  if (config.ai.apiKey) {
+    try {
+      log.info("Using AI to update spec with feature");
+      const prompt = buildFeatureSpecUpdatePrompt(existingSpec, featurePrompt, currentVersion);
+      const result = await generateFromPrompts(FEATURE_SPEC_UPDATE_SYSTEM, prompt, {
+        temperature: config.ai.specGenTemperature,
+        maxTokens: config.ai.maxTokens,
+      });
+
+      if (result.content && result.content.length > 500) {
+        log.info("AI spec update successful", {
+          length: result.content.length,
+          model: result.model,
+        });
+        return result.content;
+      }
+
+      log.warn("AI returned insufficient content, falling back to rule-based");
+    } catch (error) {
+      log.warn("AI spec update failed, falling back to rule-based", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  // Fallback: rule-based update
+  return updateSpecWithFeatureRuleBased(existingSpec, featurePrompt, currentVersion);
+}
+
+/**
+ * Rule-based spec update (fallback).
+ */
+function updateSpecWithFeatureRuleBased(
   existingSpec: string,
   featurePrompt: string,
   currentVersion: string

@@ -13,6 +13,8 @@ import {
 import { SPEC_REQUIRED_SECTIONS } from "../../schemas/spec.schema";
 import { createStage, PipelineContext } from "../../runner/pipeline";
 import { OneshotBuilderOutput } from "../../agents/types";
+import { CodeGeneratorAgent } from "../../agents/code-generator";
+import { config } from "../../config";
 
 const log = createContextLogger("api-build");
 const router = Router();
@@ -96,12 +98,38 @@ router.post("/oneshot", async (req: Request, res: Response, next: NextFunction) 
     );
 
     const generateCode = createStage<{ files: string[] }, OneshotBuilderOutput>(
-      "generate-code", "Generate application code from spec",
+      "generate-code", "Generate application code from spec using AI",
       async (input, ctx) => {
         const specContent = readFileSafe(ctx.specPath) || "";
         const userStoryCount = countUserStories(specContent);
         const apiEndpointCount = countApiEndpoints(specContent);
         const generatedFiles = [...input.files];
+
+        // Use AI-powered code generator if API key is available
+        if (config.ai.apiKey) {
+          log.info("Using AI-powered code generation", { model: config.ai.model });
+
+          const codeGenerator = new CodeGeneratorAgent();
+          const result = await codeGenerator.execute(ctx.specPath, {
+            workingDir: ctx.outputDir,
+            dryRun: ctx.dryRun,
+          });
+
+          if (result.success && result.data) {
+            log.info("AI code generation successful", {
+              filesGenerated: result.data.filesGenerated.length,
+              duration: result.duration,
+            });
+            return result.data;
+          }
+
+          log.warn("AI code generation failed, falling back to scaffold", {
+            errors: result.errors,
+          });
+        }
+
+        // Fallback: generate basic scaffold
+        log.info("Using scaffold-based code generation");
         if (apiEndpointCount > 0) {
           const p = path.join(ctx.outputDir, "src", "routes", "index.ts");
           if (!ctx.dryRun) writeFileEnsuringDir(p, `// Auto-generated API routes\nimport { Router } from "express";\nconst router = Router();\nexport default router;\n`);

@@ -1,11 +1,19 @@
 import { useState } from "react";
 import { streamRequest, SpecMetadata } from "../api/client";
+import BuildLogs from "../components/BuildLogs";
 
 interface ProgressEvent {
   step: number;
   totalSteps: number;
   label: string;
   percent: number;
+}
+
+interface LogEntry {
+  timestamp: string;
+  level: "info" | "warn" | "error" | "debug";
+  message: string;
+  data?: Record<string, unknown>;
 }
 
 const STEPS = [
@@ -26,6 +34,7 @@ export default function SpecGenerator() {
   const [error, setError] = useState("");
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,6 +45,7 @@ export default function SpecGenerator() {
     setResult(null);
     setProgress(null);
     setCompletedSteps([]);
+    setLogs([]);
 
     try {
       const stream = await streamRequest("/specs/generate", {
@@ -51,6 +61,11 @@ export default function SpecGenerator() {
         if (event === "progress") {
           const p = data as ProgressEvent;
           setProgress(p);
+          setLogs((prev) => [...prev, {
+            timestamp: new Date().toISOString(),
+            level: "info",
+            message: p.label,
+          }]);
           if (p.step > 0) {
             setCompletedSteps((prev) => {
               const next = [...prev];
@@ -70,6 +85,11 @@ export default function SpecGenerator() {
           }
         } else if (event === "error") {
           setError((data as { error: string }).error);
+          setLogs((prev) => [...prev, {
+            timestamp: new Date().toISOString(),
+            level: "error",
+            message: (data as { error: string }).error,
+          }]);
         }
       }
     } catch (err) {
@@ -204,6 +224,11 @@ export default function SpecGenerator() {
           ❌ {error}
         </div>
       )}
+
+      {/* Build Logs */}
+      <div className="mt-6">
+        <BuildLogs logs={logs} isStreaming={loading} />
+      </div>
 
       {result && (
         <div className="mt-6 bg-white border border-slate-200 rounded-xl p-6">

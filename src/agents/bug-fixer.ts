@@ -5,6 +5,9 @@ import {
 } from "./types";
 import { readFileSafe, writeFileEnsuringDir } from "../utils/file-io";
 import { createContextLogger } from "../utils/logger";
+import { config } from "../config";
+import { generateFromPrompts } from "../services/ai-client";
+import { BUG_FIX_SYSTEM, buildBugFixPrompt } from "../services/prompts/bug-analysis";
 
 const log = createContextLogger("bug-fixer");
 
@@ -29,7 +32,7 @@ export class BugFixerAgent implements Agent<BugFixerInput, BugFixerOutput> {
       const analysis = this.analyzeBug(bug);
       log.info("Bug analyzed", { strategy: analysis.strategy });
 
-      const fix = this.generateFix(bug, sourcePath, specPath);
+      const fix = await this.generateFix(bug, sourcePath, specPath);
       if (!fix) {
         return {
           success: false, data: null,
@@ -80,13 +83,48 @@ export class BugFixerAgent implements Agent<BugFixerInput, BugFixerOutput> {
     return strategies[bug.category] || { strategy: "generic", description: `Address: ${bug.message}` };
   }
 
-  private generateFix(
+  private async generateFix(
     bug: BugReport, sourcePath: string, _specPath: string
-  ): { description: string; files: Record<string, string> } | null {
+  ): Promise<{ description: string; files: Record<string, string> } | null> {
     const content = readFileSafe(path.resolve(sourcePath, bug.file));
 
     if (!content && bug.category !== "spec-violation") return null;
 
+    // Try AI-powered fix first
+    if (config.ai.apiKey && content) {
+      try {
+        log.info("Using AI to generate fix", { bugId: bug.id });
+        const prompt = buildBugFixPrompt(bug.message, bug.category, content, bug.file);
+        const result = await generateFromPrompts(BUG_FIX_SYSTEM, prompt, {
+          temperature: config.ai.bugFixTemperature,
+          maxTokens: 4000,
+        });
+
+        if (result.content && result.content.length > 100) {
+          let fixedCode = result.content.trim();
+          if (fixedCode.startsWith("```typescript") || fixedCode.startsWith("```ts")) {
+            fixedCode = fixedCode.replace(/^```(?:typescript|ts)\n?/, "");
+          }
+          if (fixedCode.startsWith("```")) fixedCode = fixedCode.replace(/^```\w*\n?/, "");
+          if (fixedCode.endsWith("```")) fixedCode = fixedCode.replace(/\n?```$/, "");
+          fixedCode = fixedCode.trim();
+
+          if (fixedCode.length > 50) {
+            return {
+              description: `AI-generated fix for: ${bug.message}`,
+              files: { [bug.file]: fixedCode },
+            };
+          }
+        }
+      } catch (error) {
+        log.warn("AI fix generation failed, falling back to rule-based", {
+          bugId: bug.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    // Fallback: rule-based fix
     switch (bug.category) {
       case "type":
         if (content && bug.message.includes("'any' type")) {

@@ -48,7 +48,14 @@ export const config = {
     provider: process.env.AI_PROVIDER || "openai",
     model: process.env.AI_MODEL || "gpt-4o",
     apiKey: process.env.AI_API_KEY || "",
+    baseUrl: process.env.AI_BASE_URL || "https://api.openai.com/v1",
     maxTokens: parseInt(process.env.AI_MAX_TOKENS || "128000", 10),
+    temperature: parseFloat(process.env.AI_TEMPERATURE || "0.7"),
+    specGenTemperature: parseFloat(process.env.AI_SPEC_GEN_TEMPERATURE || "0.4"),
+    codeGenTemperature: parseFloat(process.env.AI_CODE_GEN_TEMPERATURE || "0.2"),
+    bugFixTemperature: parseFloat(process.env.AI_BUG_FIX_TEMPERATURE || "0.1"),
+    maxRetries: parseInt(process.env.AI_MAX_RETRIES || "3", 10),
+    timeoutMs: parseInt(process.env.AI_TIMEOUT_MS || "120000", 10),
   },
 
   // ─── Notifications ───
