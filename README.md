@@ -6,7 +6,7 @@ An autonomous pipeline where AI handles the entire software lifecycle end-to-end
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    ADLC Engine                                │
+│                    ADLC Engine                            │
 ├─────────────┬──────────────┬──────────────┬─────────────────┤
 │   Spec Gen  │  One-Shot    │  Bug Scan &  │  Notification   │
 │   Agent     │  Builder     │  Auto-Fix    │  Digest         │
