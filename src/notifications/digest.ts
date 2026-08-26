@@ -158,7 +158,7 @@ export class NotificationDigest {
         ? sources.join(" & ")
         : `${sources[0]} +${sources.length - 1} more`;
 
-    return `${icons[severity]} V3 ADLC — ${sourceList} (${entries.length} events)`;
+    return `${icons[severity]} ADLC — ${sourceList} (${entries.length} events)`;
   }
 }
 

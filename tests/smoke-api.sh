@@ -1,5 +1,5 @@
 #!/bin/bash
-# Smoke test for V3 ADLC Engine API
+# Smoke test for ADLC Engine API
 set -e
 BASE="http://localhost:3000"
 PASS=0
@@ -24,7 +24,7 @@ check() {
 }
 
 echo "╔══════════════════════════════════════════╗"
-echo "║   V3 ADLC Engine — API Smoke Test        ║"
+echo "║   ADLC Engine — API Smoke Test        ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 

@@ -1,7 +1,7 @@
 import path from "path";
 
 /**
- * Centralized configuration for the V3 SDLC/ADLC Engine.
+ * Centralized configuration for the ADLC Engine.
  * All paths are resolved relative to the project root.
  */
 

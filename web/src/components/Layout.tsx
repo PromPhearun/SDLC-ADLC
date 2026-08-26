@@ -17,7 +17,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       {/* Sidebar */}
       <aside className="w-64 bg-slate-900 text-white flex flex-col">
         <div className="p-6 border-b border-slate-700">
-          <h1 className="text-lg font-bold tracking-tight">V3 ADLC Engine</h1>
+          <h1 className="text-lg font-bold tracking-tight">ADLC Engine</h1>
           <p className="text-xs text-slate-400 mt-1">Spec-Driven SDLC</p>
         </div>
         <nav className="flex-1 p-4 space-y-1">
@@ -40,7 +40,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <div className="p-4 border-t border-slate-700 text-xs text-slate-500">
-          V3 SDLC/ADLC v1.0.0
+          ADLC v1.0.0
         </div>
       </aside>
 

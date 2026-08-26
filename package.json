@@ -1,7 +1,7 @@
 {
-  "name": "v3-sdlc-adlc-engine",
+  "name": "adlc-engine",
   "version": "1.0.0",
-  "description": "V3 — Spec-Driven Autonomous Software Development Life Cycle Engine",
+  "description": "Spec-Driven Autonomous Software Development Life Cycle Engine",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

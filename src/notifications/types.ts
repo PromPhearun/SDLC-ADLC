@@ -1,5 +1,5 @@
 /**
- * Notification types for the V3 ADLC Engine.
+ * Notification types for the ADLC Engine.
  */
 
 export type NotificationSeverity = "info" | "success" | "warning" | "error";

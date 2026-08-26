@@ -49,7 +49,7 @@ app.use("/api/notifications", notificationsRoutes);
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
-    service: "v3-adlc-engine",
+    service: "adlc-engine",
     timestamp: new Date().toISOString(),
   });
 });
@@ -72,8 +72,8 @@ app.use(errorHandler);
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    log.info(`V3 ADLC Engine API server running`, { port: PORT });
-    console.log(`\n🚀 V3 ADLC Engine API`);
+    log.info(`ADLC Engine API server running`, { port: PORT });
+    console.log(`\n🚀 ADLC Engine API`);
     console.log(`   http://localhost:${PORT}`);
     console.log(`   Health: http://localhost:${PORT}/api/health`);
     console.log(`\n   Endpoints:`);

@@ -38,7 +38,7 @@ export function formatSlackMessage(digest: DigestSummary): SlackMessage {
 
   return {
     channel: config.notifications.slackChannel,
-    username: "V3 ADLC Engine",
+    username: "ADLC Engine",
     icon_emoji: ":robot_face:",
     blocks,
     text: digest.title, // Fallback text

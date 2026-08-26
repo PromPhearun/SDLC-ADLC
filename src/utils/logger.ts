@@ -29,7 +29,7 @@ const consoleFormat = winston.format.combine(
 export const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || "info",
   format: logFormat,
-  defaultMeta: { service: "v3-adlc-engine" },
+  defaultMeta: { service: "adlc-engine" },
   transports: [
     // Console output (succinct)
     new winston.transports.Console({

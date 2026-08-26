@@ -129,7 +129,7 @@ export async function runAudit(
  */
 export function printAuditReport(report: AuditReport): void {
   console.log("\n" + "═".repeat(60));
-  console.log("  V3 SDLC/ADLC — Spec Coverage Audit Report");
+  console.log("  ADLC — Spec Coverage Audit Report");
   console.log("═".repeat(60));
   console.log(`  Timestamp: ${report.timestamp}`);
   console.log("─".repeat(60));

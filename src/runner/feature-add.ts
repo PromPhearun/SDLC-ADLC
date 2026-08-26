@@ -112,7 +112,7 @@ function updateSpecWithFeature(
   }
 
   // Update changelog
-  const changelogEntry = `\n| ${newVersion} | ${now} | V3 ADLC Engine | Feature: ${featurePrompt.substring(0, 60)} |`;
+  const changelogEntry = `\n| ${newVersion} | ${now} | ADLC Engine | Feature: ${featurePrompt.substring(0, 60)} |`;
   const changelogIdx = updated.indexOf("## 9. Changelog");
   if (changelogIdx > -1) {
     const tableEnd = updated.indexOf("\n\n", changelogIdx + 50);

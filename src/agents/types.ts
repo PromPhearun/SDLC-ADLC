@@ -1,5 +1,5 @@
 /**
- * Shared types for all V3 agents.
+ * Shared types for all ADLC agents.
  */
 
 /** Standard agent execution result */
