@@ -12,9 +12,10 @@ Successfully integrated AI (LiteLLM/MiMo-V2.5-Pro) into all ADLC Engine agents.
 - Added per-operation temperature settings (spec: 0.4, code: 0.2, bug: 0.1)
 
 ### Phase 6: Frontend Components
-- Created `CodePreview.tsx` - File tree + code preview
-- Created `BuildLogs.tsx` - Real-time streaming log viewer
-- Updated `OneShotBuilder.tsx` and `SpecGenerator.tsx` with new components
+- Created `CodePreview.tsx` - File tree + code preview with syntax highlighting
+- Created `BuildLogs.tsx` - Real-time streaming log viewer with level filtering
+- Updated `OneShotBuilder.tsx` with build mode selector (fresh/existing) and code preview
+- Updated `SpecGenerator.tsx` with inline spec editing and save functionality
 
 ### Phase 7: Verification
 - Backend: ✅ Zero TypeScript errors
@@ -24,9 +25,23 @@ Successfully integrated AI (LiteLLM/MiMo-V2.5-Pro) into all ADLC Engine agents.
 ## Key Features
 
 1. **AI-First Pattern**: Try AI → fallback to templates if unavailable
-2. **Streaming**: Real-time progress via SSE
+2. **Streaming**: Real-time progress via SSE for both spec generation and builds
 3. **Multi-file Generation**: Parses `===FILE:filename===` markers
 4. **Spec Parsing**: Extracts user stories, API endpoints, data models from markdown
+5. **Spec Editing**: Inline editing of generated specs with save-to-disk capability
+6. **Build Modes**: Support for `fresh` and `existing` build modes
+7. **Code Preview**: File tree navigation with syntax-highlighted code preview
+
+## Generated Specs
+
+The engine has successfully generated specs for multiple projects:
+
+| Project | Version | Status | Last Updated |
+|---------|---------|--------|--------------|
+| trading-platform | 0.1.1 | draft | 2026-08-26 |
+| Web SEO | 0.1.0 | draft | 2026-08-26 |
+| World football match dashboard | 0.1.0 | draft | 2026-08-28 |
+| Job Hunting | 0.1.0 | draft | 2026-08-28 |
 
 ## Configuration
 
@@ -41,6 +56,12 @@ LITELLM_MODEL=MiMo-V2.5-Pro
 **New (8)**: ai-client.ts, ai-types.ts, 4 prompt templates, CodePreview.tsx, BuildLogs.tsx
 
 **Modified (10)**: config, spec-generator, code-generator, bug-scanner, bug-fixer, feature-add, oneshot-builder, build.ts, OneShotBuilder.tsx, SpecGenerator.tsx
+
+## API Endpoints Added
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `PUT` | `/api/specs/save` | Save/update spec content to disk |
 
 ## Next Steps (Optional)
 

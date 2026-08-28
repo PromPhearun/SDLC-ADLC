@@ -96,9 +96,11 @@ npm run start        # Start Express serving built frontend
 | `/src/auditor` | Spec coverage auditor |
 | `/src/notifications` | Log digest & Slack integration |
 | `/src/schemas` | JSON Schema validators |
+| `/src/services` | AI client, types, and prompt templates |
 | `/src/utils` | Shared utilities |
 | `/src/server` | Express API server (routes, middleware) |
 | `/web` | React + Vite + Tailwind frontend |
+| `/build-output` | Generated application output |
 | `/tests` | Unit & integration tests |
 
 ## API Endpoints
@@ -109,6 +111,7 @@ npm run start        # Start Express serving built frontend
 | `POST` | `/api/specs/generate` | Generate spec from prompt | SSE stream |
 | `GET` | `/api/specs` | List all specs | JSON |
 | `GET` | `/api/specs/:name` | Get spec content | JSON |
+| `PUT` | `/api/specs/save` | Save/update spec content | JSON |
 | `POST` | `/api/build/oneshot` | One-shot build | SSE stream |
 | `POST` | `/api/features/add` | Add feature to spec | JSON |
 | `POST` | `/api/bugs/scan` | Scan for bugs | JSON |
@@ -122,7 +125,7 @@ The Spec Generator and One-Shot Builder endpoints use **Server-Sent Events (SSE)
 
 **Spec Generator** (`POST /api/specs/generate`) emits:
 - `progress` — step-by-step updates (template loading → prompt analysis → content generation → file writing → finalization)
-- `result` — final spec metadata (project name, version, user story count, API endpoint count, section count, output path, spec preview)
+- `result` — final spec metadata (project name, version, user story count, API endpoint count, section count, output path, spec content)
 - `done` — stream completion signal
 
 **One-Shot Builder** (`POST /api/build/oneshot`) emits:
@@ -132,3 +135,16 @@ The Spec Generator and One-Shot Builder endpoints use **Server-Sent Events (SSE)
 - `done` — stream completion signal
 
 Both endpoints also emit `error` events if something goes wrong mid-stream.
+
+### Build Modes
+
+The One-Shot Builder supports two build modes via the `mode` parameter:
+
+| Mode | Description |
+|------|-------------|
+| `fresh` | Clean build from scratch (default) |
+| `existing` | Build on top of existing project structure |
+
+### Spec Editing
+
+After generating a spec, the Web UI allows inline editing of the spec content. Use the `PUT /api/specs/save` endpoint to persist changes to disk.
