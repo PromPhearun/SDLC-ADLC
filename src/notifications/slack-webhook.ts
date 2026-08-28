@@ -1,6 +1,7 @@
 import { DigestSummary, SlackMessage, SlackBlock } from "./types";
 import { config } from "../config";
 import { createContextLogger } from "../utils/logger";
+import { httpFetch } from "../utils/http";
 
 const log = createContextLogger("slack-webhook");
 
@@ -59,7 +60,7 @@ export async function sendToSlack(digest: DigestSummary): Promise<boolean> {
   const message = formatSlackMessage(digest);
 
   try {
-    const response = await fetch(webhookUrl, {
+    const response = await httpFetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(message),

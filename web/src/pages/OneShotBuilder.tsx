@@ -210,6 +210,24 @@ function BuildResultPanel({ result }: { result: BuildResult }) {
         <div><p className="text-xs text-slate-500">Tests Passing</p><p className="text-lg font-bold text-slate-800">{result.testsPassing ? "✅ Yes" : "❌ No"}</p></div>
       </div>
 
+      {/* Preview App Instructions */}
+      <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+        <h3 className="text-md font-semibold text-green-800 mb-2">🚀 Preview Your App</h3>
+        <p className="text-sm text-green-700 mb-3">
+          Your application has been generated. Run the following commands to install dependencies and start the dev server:
+        </p>
+        <div className="bg-gray-900 rounded-lg p-4 font-mono text-sm">
+          <p className="text-gray-400"># Install dependencies</p>
+          <p className="text-green-400">cd ./build-output</p>
+          <p className="text-green-400">npm install</p>
+          <p className="text-gray-400 mt-2"># Start the dev server</p>
+          <p className="text-green-400">npm run dev</p>
+        </div>
+        <p className="text-sm text-green-700 mt-3">
+          Then open <a href="http://localhost:5174" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:text-green-900">http://localhost:5174</a> in your browser to view the app.
+        </p>
+      </div>
+
       {/* Code Preview */}
       {result.filesGenerated.length > 0 && (
         <div className="mt-4">

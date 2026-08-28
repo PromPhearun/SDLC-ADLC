@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { streamRequest, SpecMetadata } from "../api/client";
+import { streamRequest, api, SpecMetadata } from "../api/client";
 import BuildLogs from "../components/BuildLogs";
 
 interface ProgressEvent {
@@ -29,12 +29,16 @@ export default function SpecGenerator() {
   const [projectName, setProjectName] = useState("");
   const [constraints, setConstraints] = useState("");
   const [dryRun, setDryRun] = useState(false);
-  const [result, setResult] = useState<SpecMetadata & { outputPath?: string; specPreview?: string } | null>(null);
+  const [result, setResult] = useState<SpecMetadata & { outputPath?: string; specContent?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [editableContent, setEditableContent] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveError, setSaveError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,9 +80,13 @@ export default function SpecGenerator() {
             });
           }
         } else if (event === "result") {
-          const res = data as { success: boolean; data: (SpecMetadata & { outputPath?: string; specPreview?: string }) | null; errors?: string[] };
+          const res = data as { success: boolean; data: (SpecMetadata & { outputPath?: string; specContent?: string }) | null; errors?: string[] };
           if (res.success && res.data) {
             setResult(res.data);
+            if (res.data.specContent) {
+              setEditableContent(res.data.specContent);
+              setIsEditing(true);
+            }
             setCompletedSteps([1, 2, 3, 4, 5]);
           } else {
             setError(res.errors?.join(", ") || "Spec generation failed");
@@ -97,6 +105,31 @@ export default function SpecGenerator() {
     } finally {
       setLoading(false);
       setProgress(null);
+    }
+  }
+
+  async function handleSaveSpec() {
+    if (!result?.outputPath || !editableContent) return;
+
+    setSaveStatus("saving");
+    setSaveError("");
+
+    try {
+      const res = await api.saveSpec({
+        outputPath: result.outputPath,
+        content: editableContent,
+      });
+
+      if (res.success) {
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 3000);
+      } else {
+        setSaveStatus("error");
+        setSaveError("Failed to save spec");
+      }
+    } catch (err) {
+      setSaveStatus("error");
+      setSaveError(err instanceof Error ? err.message : "Failed to save spec");
     }
   }
 
@@ -240,15 +273,41 @@ export default function SpecGenerator() {
             <InfoItem label="User Stories" value={String(result.userStoryCount)} />
           </div>
           {result.outputPath && <InfoItem label="Output Path" value={result.outputPath} />}
-          {result.specPreview && (
-            <details className="mt-4">
-              <summary className="text-sm font-medium text-slate-600 cursor-pointer hover:text-slate-800">
-                📄 Preview spec content
-              </summary>
-              <pre className="mt-2 p-4 bg-slate-50 rounded-lg text-xs text-slate-700 overflow-auto max-h-64 whitespace-pre-wrap">
-                {result.specPreview}
-              </pre>
-            </details>
+
+          {/* Editable Spec Content */}
+          {isEditing && (
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-md font-semibold text-slate-700">📄 Spec Content (Editable)</h3>
+                <div className="flex items-center gap-3">
+                  {saveStatus === "saved" && (
+                    <span className="text-sm text-green-600 font-medium">✅ Saved</span>
+                  )}
+                  {saveStatus === "error" && (
+                    <span className="text-sm text-red-600 font-medium">❌ {saveError}</span>
+                  )}
+                  <button
+                    onClick={handleSaveSpec}
+                    disabled={saveStatus === "saving"}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {saveStatus === "saving" ? "Saving..." : "💾 Save Changes"}
+                  </button>
+                </div>
+              </div>
+              <textarea
+                value={editableContent}
+                onChange={(e) => {
+                  setEditableContent(e.target.value);
+                  setSaveStatus("idle");
+                }}
+                className="w-full h-96 p-4 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-700 font-mono whitespace-pre-wrap resize-y focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+                spellCheck={false}
+              />
+              <p className="mt-2 text-xs text-slate-400">
+                Edit the spec content above and click "Save Changes" to update the file on disk.
+              </p>
+            </div>
           )}
         </div>
       )}

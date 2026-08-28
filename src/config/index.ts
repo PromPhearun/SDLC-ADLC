@@ -1,4 +1,5 @@
 import path from "path";
+import dotenv from "dotenv";
 
 /**
  * Centralized configuration for the ADLC Engine.
@@ -6,6 +7,11 @@ import path from "path";
  */
 
 const ROOT_DIR = path.resolve(__dirname, "../..");
+
+// Load .env from the project root so every entry point (API server + CLIs)
+// picks up environment configuration. Real environment variables win:
+// dotenv never overrides variables that are already set.
+dotenv.config({ path: path.join(ROOT_DIR, ".env") });
 
 export const config = {
   // ─── Paths ───
@@ -55,7 +61,9 @@ export const config = {
     codeGenTemperature: parseFloat(process.env.AI_CODE_GEN_TEMPERATURE || "0.2"),
     bugFixTemperature: parseFloat(process.env.AI_BUG_FIX_TEMPERATURE || "0.1"),
     maxRetries: parseInt(process.env.AI_MAX_RETRIES || "3", 10),
-    timeoutMs: parseInt(process.env.AI_TIMEOUT_MS || "120000", 10),
+    // Full spec generation (max_tokens 128k) can take ~3 min, so the default
+    // must cover that; raise via AI_TIMEOUT_MS if the model slows down.
+    timeoutMs: parseInt(process.env.AI_TIMEOUT_MS || "300000", 10),
   },
 
   // ─── Notifications ───

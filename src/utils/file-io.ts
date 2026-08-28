@@ -126,3 +126,13 @@ export function isDirectory(dirPath: string): boolean {
     return false;
   }
 }
+
+/**
+ * Check whether a resolved path is inside (or equal to) the given root
+ * directory. Used to keep API-supplied paths contained within the project.
+ */
+export function isPathWithinRoot(targetPath: string, rootDir: string): boolean {
+  const target = path.resolve(targetPath);
+  const root = path.resolve(rootDir);
+  return target === root || target.startsWith(root + path.sep);
+}

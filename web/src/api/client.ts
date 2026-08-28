@@ -215,6 +215,12 @@ export const api = {
       `/specs/${projectName}`
     ),
 
+  saveSpec: (body: { outputPath: string; content: string }) =>
+    request<ApiResponse<{ outputPath: string; message: string }>>("/specs/save", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
   // Build
   runBuild: (body: {
     specPath: string;

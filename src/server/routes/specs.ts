@@ -2,6 +2,8 @@ import { Router, Request, Response, NextFunction } from "express";
 import path from "path";
 import { SpecGeneratorAgent } from "../../agents/spec-generator";
 import { createContextLogger } from "../../utils/logger";
+import { writeFileEnsuringDir, isPathWithinRoot } from "../../utils/file-io";
+import { config } from "../../config";
 
 const log = createContextLogger("api-specs");
 const router = Router();
@@ -21,6 +23,27 @@ router.post("/generate", async (req: Request, res: Response, next: NextFunction)
         error: "Missing required field: prompt",
       });
       return;
+    }
+
+    // Validate optional outputPath before streaming starts (must stay
+    // inside the project root).
+    let resolvedOutputPath: string | undefined;
+    if (outputPath !== undefined) {
+      if (typeof outputPath !== "string" || !outputPath) {
+        res.status(400).json({
+          success: false,
+          error: "Field 'outputPath' must be a non-empty string",
+        });
+        return;
+      }
+      resolvedOutputPath = path.resolve(outputPath);
+      if (!isPathWithinRoot(resolvedOutputPath, config.paths.root)) {
+        res.status(400).json({
+          success: false,
+          error: "Field 'outputPath' must resolve within the project root",
+        });
+        return;
+      }
     }
 
     log.info("API: Generating spec", { prompt: prompt.substring(0, 100) });
@@ -59,7 +82,7 @@ router.post("/generate", async (req: Request, res: Response, next: NextFunction)
       {
         prompt,
         projectName,
-        outputPath: outputPath ? path.resolve(outputPath) : undefined,
+        outputPath: resolvedOutputPath,
         constraints: constraints || undefined,
       },
       context
@@ -84,7 +107,7 @@ router.post("/generate", async (req: Request, res: Response, next: NextFunction)
           apiEndpointCount: result.data.metadata.apiEndpointCount,
           sectionCount: result.data.metadata.sectionCount,
           outputPath: result.data.outputPath,
-          specPreview: result.data.specContent.substring(0, 2000),
+          specContent: result.data.specContent,
         }
       : null;
 
@@ -114,5 +137,65 @@ router.post("/generate", async (req: Request, res: Response, next: NextFunction)
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+/**
+ * PUT /api/specs/save
+ * Save/update a spec file with edited content.
+ */
+router.put("/save", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { outputPath, content } = req.body;
+
+    if (!outputPath || typeof outputPath !== "string") {
+      res.status(400).json({
+        success: false,
+        error: "Missing required field: outputPath",
+      });
+      return;
+    }
+
+    if (content === undefined || typeof content !== "string") {
+      res.status(400).json({
+        success: false,
+        error: "Missing required field: content",
+      });
+      return;
+    }
+
+    log.info("API: Saving spec", { outputPath });
+
+    const resolvedPath = path.resolve(outputPath);
+
+    if (!isPathWithinRoot(resolvedPath, config.paths.root)) {
+      res.status(400).json({
+        success: false,
+        error: "Field 'outputPath' must resolve within the project root",
+      });
+      return;
+    }
+
+    const written = writeFileEnsuringDir(resolvedPath, content);
+
+    if (!written) {
+      res.status(500).json({
+        success: false,
+        error: `Failed to write spec to ${resolvedPath}`,
+      });
+      return;
+    }
+
+    log.info("Spec saved successfully", { outputPath: resolvedPath });
+
+    res.json({
+      success: true,
+      data: {
+        outputPath: resolvedPath,
+        message: "Spec saved successfully",
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

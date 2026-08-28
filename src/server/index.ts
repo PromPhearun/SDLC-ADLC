@@ -59,8 +59,13 @@ app.get("/api/health", (_req, res) => {
 if (process.env.NODE_ENV === "production") {
   const webDist = path.join(__dirname, "../../web/dist");
   app.use(express.static(webDist));
-  app.get("*", (_req, res) => {
-    res.sendFile(path.join(webDist, "index.html"));
+  // SPA fallback: serve index.html for non-API GET requests.
+  // (Express 5 removed the "*" wildcard, so a middleware is used instead.)
+  app.use((req, res, next) => {
+    if (req.method === "GET" && !req.path.startsWith("/api")) {
+      return res.sendFile(path.join(webDist, "index.html"));
+    }
+    next();
   });
 }
 
@@ -70,7 +75,13 @@ app.use(errorHandler);
 
 // ─── Start Server ───────────────────────────────────────────
 
-if (require.main === module) {
+/**
+ * Starts listening on the configured port. Exported so the root entry point
+ * (src/index.ts) can boot the server too — when this module is loaded as a
+ * dependency, `require.main` is not this module and the guard below would
+ * never fire.
+ */
+export function startServer() {
   app.listen(PORT, () => {
     log.info(`ADLC Engine API server running`, { port: PORT });
     console.log(`\n🚀 ADLC Engine API`);
@@ -88,6 +99,10 @@ if (require.main === module) {
     console.log(`   GET  /api/notifications/digest — Get digest`);
     console.log();
   });
+}
+
+if (require.main === module) {
+  startServer();
 }
 
 export default app;

@@ -5,6 +5,7 @@
 
 import { config } from "../config";
 import { createContextLogger } from "../utils/logger";
+import { httpFetch, iterBodyLines } from "../utils/http";
 import {
   ChatMessage,
   ChatCompletionRequest,
@@ -32,7 +33,10 @@ function sleep(ms: number): Promise<void> {
 /**
  * Make the actual HTTP request to the AI API.
  */
-async function makeRequest(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
+async function makeRequest(
+  request: ChatCompletionRequest,
+  timeoutMs: number
+): Promise<ChatCompletionResponse> {
   const apiKey = config.ai.apiKey;
   const baseUrl = config.ai.baseUrl || "https://api.openai.com/v1";
 
@@ -40,14 +44,14 @@ async function makeRequest(request: ChatCompletionRequest): Promise<ChatCompleti
     throw { code: "NO_API_KEY", message: "AI API key not configured", retryable: false };
   }
 
-  const response = await fetch(`${baseUrl}/chat/completions`, {
+  const response = await httpFetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(request),
-    signal: AbortSignal.timeout(DEFAULT_OPTIONS.timeoutMs),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 
   if (!response.ok) {
@@ -75,6 +79,9 @@ export async function generate(
   const maxTokens = options.maxTokens || DEFAULT_OPTIONS.maxTokens;
   const temperature = options.temperature ?? DEFAULT_OPTIONS.temperature;
   const retries = options.retries ?? DEFAULT_OPTIONS.retries;
+  // Per-call override, else the configured timeout (covers long spec
+  // generations that can take several minutes with large max_tokens).
+  const timeoutMs = options.timeoutMs ?? config.ai.timeoutMs;
 
   const request: ChatCompletionRequest = {
     model,
@@ -91,7 +98,7 @@ export async function generate(
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const response = await makeRequest(request);
+      const response = await makeRequest(request, timeoutMs);
       const duration = Date.now() - startTime;
 
       log.info("AI response", {
@@ -113,11 +120,17 @@ export async function generate(
         finishReason: response.choices[0]?.finish_reason || "unknown",
       };
     } catch (error) {
-      lastError = error instanceof Error
-        ? { code: "REQUEST_FAILED", message: error.message, retryable: attempt < retries }
-        : { code: "UNKNOWN", message: String(error), retryable: attempt < retries };
+      // Preserve the message of AIError plain objects thrown by makeRequest
+      // (they are not Error instances, so String(error) would lose it).
+      const base =
+        error instanceof Error
+          ? { code: "REQUEST_FAILED", message: error.message }
+          : error !== null && typeof error === "object" && "message" in error
+            ? (error as AIError)
+            : { code: "UNKNOWN", message: String(error) };
+      lastError = { ...base, retryable: attempt < retries };
 
-      log.warn(`AI request failed (attempt ${attempt}/${retries})`, { error: lastError.message });
+      log.warn(`AI request failed (attempt ${attempt}/${retries})`, { error: lastError });
 
       if (attempt < retries) {
         const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
@@ -161,14 +174,14 @@ export async function generateStream(
     throw { code: "NO_API_KEY", message: "AI API key not configured", retryable: false };
   }
 
-  const response = await fetch(`${baseUrl}/chat/completions`, {
+  const response = await httpFetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(request),
-    signal: AbortSignal.timeout(options.timeoutMs || DEFAULT_OPTIONS.timeoutMs),
+    signal: AbortSignal.timeout(options.timeoutMs ?? config.ai.timeoutMs),
   });
 
   if (!response.ok) {
@@ -187,40 +200,30 @@ export async function generateStream(
 
   let fullContent = "";
   let finishReason: string | null = null;
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  // iterBodyLines handles both Web ReadableStreams (native fetch) and
+  // Node.js Readable streams (node-fetch fallback on Node 16).
+  for await (const line of iterBodyLines(response.body)) {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.startsWith("data: ")) continue;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
+    const data = trimmed.slice(6);
+    if (data === "[DONE]") {
+      onChunk("", true);
+      continue;
+    }
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith("data: ")) continue;
+    try {
+      const chunk: StreamingChunk = JSON.parse(data);
+      const content = chunk.choices[0]?.delta?.content || "";
+      finishReason = chunk.choices[0]?.finish_reason || finishReason;
 
-      const data = trimmed.slice(6);
-      if (data === "[DONE]") {
-        onChunk("", true);
-        continue;
+      if (content) {
+        fullContent += content;
+        onChunk(content, false);
       }
-
-      try {
-        const chunk: StreamingChunk = JSON.parse(data);
-        const content = chunk.choices[0]?.delta?.content || "";
-        finishReason = chunk.choices[0]?.finish_reason || finishReason;
-
-        if (content) {
-          fullContent += content;
-          onChunk(content, false);
-        }
-      } catch {
-        // Skip malformed chunks
-      }
+    } catch {
+      // Skip malformed chunks
     }
   }
 
