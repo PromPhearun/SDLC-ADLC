@@ -12,6 +12,8 @@ import featuresRoutes from "./routes/features";
 import bugsRoutes from "./routes/bugs";
 import auditRoutes from "./routes/audit";
 import notificationsRoutes from "./routes/notifications";
+import githubRoutes from "./routes/github";
+import settingsRoutes from "./routes/settings";
 
 const log = createContextLogger("server");
 
@@ -44,6 +46,8 @@ app.use("/api/features", featuresRoutes);
 app.use("/api/bugs", bugsRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/api/github", githubRoutes);
+app.use("/api/settings", settingsRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {
@@ -97,6 +101,14 @@ export function startServer() {
     console.log(`   POST /api/bugs/fix            — Auto-fix bug`);
     console.log(`   GET  /api/audit               — Run spec audit`);
     console.log(`   GET  /api/notifications/digest — Get digest`);
+    console.log(`   POST /api/github/clone        — Clone repository`);
+    console.log(`   POST /api/github/push         — Push changes`);
+    console.log(`   GET  /api/github/status       — Git status`);
+    console.log(`   GET  /api/github/repos        — List repos`);
+    console.log(`   GET  /api/settings/llm        — Get LLM configs`);
+    console.log(`   PUT  /api/settings/llm/:agent — Update agent LLM`);
+    console.log(`   POST /api/settings/llm/test   — Test LLM connection`);
+    console.log(`   GET  /api/settings/providers  — List providers`);
     console.log();
   });
 }

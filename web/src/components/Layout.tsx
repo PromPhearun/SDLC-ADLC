@@ -9,6 +9,8 @@ const navItems = [
   { to: "/bugs", label: "Bug Scanner", icon: "🐛" },
   { to: "/audit", label: "Audit Report", icon: "🔍" },
   { to: "/notifications", label: "Notifications", icon: "🔔" },
+  { to: "/github", label: "GitHub", icon: "🐙" },
+  { to: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {

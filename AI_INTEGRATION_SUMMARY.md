@@ -62,10 +62,42 @@ LITELLM_MODEL=MiMo-V2.5-Pro
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `PUT` | `/api/specs/save` | Save/update spec content to disk |
+| `POST` | `/api/github/clone` | Clone a Git repository |
+| `POST` | `/api/github/push` | Stage, commit & push changes |
+| `GET` | `/api/github/status` | Get git status for a repo |
+| `GET` | `/api/github/repos` | List locally cloned repos |
+| `DELETE` | `/api/github/repos/:name` | Delete a local repo |
+| `GET` | `/api/settings/llm` | Get LLM configs for all agents |
+| `PUT` | `/api/settings/llm/:agentId` | Update agent LLM config |
+| `POST` | `/api/settings/llm/test` | Test LLM connection |
+| `GET` | `/api/settings/providers` | List supported LLM providers |
 
-## Next Steps (Optional)
+## Phase 8: GitHub Integration & Per-Agent LLM Settings
 
-- End-to-end test with actual LiteLLM API
-- Add caching for AI responses
-- Parallel file generation
-- Cost tracking
+### GitHub Integration
+- **Backend**: `src/server/routes/github.ts` — Full Git operations via `simple-git` (clone, push, status, repos, delete)
+- **Frontend**: `web/src/pages/GitHub.tsx` — Clone form, push form, repo list, detailed status panel
+- Repos stored in `cloned-repos/` under project root
+- Supports branch selection, commit messages, and remote push
+
+### Per-Agent LLM Settings
+- **Backend**: `src/server/routes/settings.ts` — CRUD for agent LLM configs, test connection, provider presets
+- **Frontend**: `web/src/pages/Settings.tsx` — Tabbed per-agent config UI with provider presets
+- 7 providers: OpenAI, Anthropic, Google, Mistral, LiteLLM, Ollama, Custom
+- Settings persisted to `.agent-settings.json`, falling back to `.env` defaults
+- Test connection endpoint validates API key, base URL, and model before saving
+
+### Files Created (4)
+- `src/server/routes/github.ts`
+- `src/server/routes/settings.ts`
+- `web/src/pages/GitHub.tsx`
+- `web/src/pages/Settings.tsx`
+
+### Files Modified (7)
+- `src/server/index.ts` — Registered github + settings routes
+- `web/src/App.tsx` — Added `/github` and `/settings` routes
+- `web/src/components/Layout.tsx` — Added GitHub and Settings nav items
+- `web/src/api/client.ts` — Added GitHub/Settings API functions + types
+- `web/src/pages/Dashboard.tsx` — Added GitHub repos widget
+- `package.json` — Added `simple-git` dependency
+- `README.md` — Updated API docs with new endpoints

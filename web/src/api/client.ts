@@ -190,6 +190,66 @@ export interface BuildResult {
   duration: number;
 }
 
+// ─── GitHub Types ───────────────────────────────────────────
+
+export interface GithubRepoInfo {
+  name: string;
+  path: string;
+  url: string;
+  branch: string;
+  files: number;
+  lastCommit: { hash: string; message: string; date: string } | null;
+}
+
+export interface GithubRepo {
+  name: string;
+  path: string;
+  branch: string | null;
+  isClean: boolean;
+  lastCommit: { hash: string; message: string; date: string } | null;
+}
+
+export interface GithubStatus {
+  branch: string | null;
+  tracking: string;
+  ahead: number;
+  behind: number;
+  modified: string[];
+  created: string[];
+  deleted: string[];
+  renamed: string[];
+  staged: string[];
+  notAdded: string[];
+  conflicted: string[];
+  isClean: boolean;
+  commits: { hash: string; message: string; author: string; date: string }[];
+  remotes: { name: string; url: string }[];
+}
+
+// ─── Settings Types ─────────────────────────────────────────
+
+export interface LLMConfig {
+  provider: string;
+  model: string;
+  apiKey: string;
+  baseUrl: string;
+  temperature: number;
+  maxTokens: number;
+}
+
+export interface AgentSettings {
+  "spec-generator": LLMConfig;
+  "oneshot-builder": LLMConfig;
+  "bug-scanner": LLMConfig;
+}
+
+export interface Provider {
+  id: string;
+  name: string;
+  baseUrl: string;
+  models: string[];
+}
+
 // ─── API Functions ──────────────────────────────────────────
 
 export const api = {
@@ -274,4 +334,47 @@ export const api = {
     request<ApiResponse<DigestSummary | null>>(
       `/notifications/digest${demo ? "?demo=true" : ""}`
     ),
+
+  // GitHub
+  githubClone: (body: { url: string; name?: string; branch?: string }) =>
+    request<{ success: boolean; data: GithubRepoInfo }>("/github/clone", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  githubPush: (body: { repoPath: string; message: string; branch?: string }) =>
+    request<{ success: boolean; data: { branch: string; commit: string; summary: { changes: number; insertions: number; deletions: number }; changes: { before: number; after: number } } }>(
+      "/github/push",
+      { method: "POST", body: JSON.stringify(body) }
+    ),
+
+  githubStatus: (repoPath: string) =>
+    request<{ success: boolean; data: GithubStatus }>(`/github/status?path=${encodeURIComponent(repoPath)}`),
+
+  githubListRepos: () =>
+    request<{ success: boolean; data: GithubRepo[] }>("/github/repos"),
+
+  githubDeleteRepo: (name: string) =>
+    request<{ success: boolean; data: { message: string } }>(`/github/repos/${encodeURIComponent(name)}`, {
+      method: "DELETE",
+    }),
+
+  // Settings
+  settingsGetLLM: () =>
+    request<{ success: boolean; data: AgentSettings }>("/settings/llm"),
+
+  settingsUpdateLLM: (agentId: string, config: LLMConfig) =>
+    request<{ success: boolean; data: LLMConfig }>(`/settings/llm/${agentId}`, {
+      method: "PUT",
+      body: JSON.stringify(config),
+    }),
+
+  settingsTestLLM: (config: { apiKey: string; baseUrl: string; model: string }) =>
+    request<{ success: boolean; data?: { response: string; model: string; tokens: number; duration: number }; error?: string }>(
+      "/settings/llm/test",
+      { method: "POST", body: JSON.stringify(config) }
+    ),
+
+  settingsGetProviders: () =>
+    request<{ success: boolean; data: Provider[] }>("/settings/providers"),
 };

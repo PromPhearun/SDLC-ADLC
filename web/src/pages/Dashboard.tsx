@@ -1,23 +1,26 @@
 import { useEffect, useState } from "react";
-import { api, SpecsDirectory, AuditReport, DigestSummary } from "../api/client";
+import { api, SpecsDirectory, AuditReport, DigestSummary, GithubRepo } from "../api/client";
 
 export default function Dashboard() {
   const [specs, setSpecs] = useState<SpecsDirectory | null>(null);
   const [audit, setAudit] = useState<AuditReport | null>(null);
   const [digest, setDigest] = useState<DigestSummary | null>(null);
+  const [repos, setRepos] = useState<GithubRepo[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [specsRes, auditRes, digestRes] = await Promise.allSettled([
+        const [specsRes, auditRes, digestRes, reposRes] = await Promise.allSettled([
           api.listSpecs(),
           api.runAudit(),
           api.getDigest(true),
+          api.githubListRepos(),
         ]);
         if (specsRes.status === "fulfilled") setSpecs(specsRes.value.data);
         if (auditRes.status === "fulfilled") setAudit(auditRes.value.data);
         if (digestRes.status === "fulfilled") setDigest(digestRes.value.data);
+        if (reposRes.status === "fulfilled") setRepos(reposRes.value.data);
       } finally {
         setLoading(false);
       }
@@ -48,6 +51,32 @@ export default function Dashboard() {
         <SpecsList specs={specs} />
         <ActivityPanel digest={digest} />
       </div>
+
+      {/* GitHub Repos Widget */}
+      {repos.length > 0 && (
+        <div className="mt-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">🐙 GitHub Repositories</h2>
+          <div className="space-y-2">
+            {repos.map((repo) => (
+              <div key={repo.name} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">📁</span>
+                  <div>
+                    <div className="font-medium text-slate-800">{repo.name}</div>
+                    <div className="text-xs text-slate-500">
+                      {repo.branch && <span className="mr-3">🔀 {repo.branch}</span>}
+                      {repo.isClean ? <span className="text-green-600">✓ Clean</span> : <span className="text-amber-600">● Modified</span>}
+                    </div>
+                  </div>
+                </div>
+                {repo.lastCommit && (
+                  <code className="text-xs text-slate-400 font-mono">{repo.lastCommit.hash}</code>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {audit && audit.recommendations.length > 0 && (
         <RecommendationsPanel recommendations={audit.recommendations} />

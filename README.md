@@ -118,6 +118,15 @@ npm run start        # Start Express serving built frontend
 | `POST` | `/api/bugs/fix` | Auto-fix a bug | JSON |
 | `GET` | `/api/audit` | Run spec coverage audit | JSON |
 | `GET` | `/api/notifications/digest` | Get notification digest | JSON |
+| `POST` | `/api/github/clone` | Clone a Git repository | JSON |
+| `POST` | `/api/github/push` | Stage, commit & push changes | JSON |
+| `GET` | `/api/github/status` | Get git status for a repo | JSON |
+| `GET` | `/api/github/repos` | List locally cloned repos | JSON |
+| `DELETE` | `/api/github/repos/:name` | Delete a local repo | JSON |
+| `GET` | `/api/settings/llm` | Get LLM configs for all agents | JSON |
+| `PUT` | `/api/settings/llm/:agentId` | Update agent LLM config | JSON |
+| `POST` | `/api/settings/llm/test` | Test LLM connection | JSON |
+| `GET` | `/api/settings/providers` | List supported LLM providers | JSON |
 
 ### Real-Time Progress Streaming
 
@@ -148,3 +157,28 @@ The One-Shot Builder supports two build modes via the `mode` parameter:
 ### Spec Editing
 
 After generating a spec, the Web UI allows inline editing of the spec content. Use the `PUT /api/specs/save` endpoint to persist changes to disk.
+
+### GitHub Integration
+
+Clone, manage, and push to Git repositories directly from the Web UI. Repositories are stored in the `cloned-repos/` directory under the project root.
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/github/clone` | Clone a repository by URL (optional: name, branch) |
+| `POST /api/github/push` | Stage all changes, commit with message, and push to remote |
+| `GET /api/github/status` | Get branch, ahead/behind counts, modified files, and recent commits |
+| `GET /api/github/repos` | List all locally cloned repositories with metadata |
+| `DELETE /api/github/repos/:name` | Delete a local repository from disk |
+
+### Per-Agent LLM Settings
+
+Each AI agent (Spec Generator, One-Shot Builder, Bug Scanner) can be configured with its own LLM provider, model, and parameters. Settings are persisted to `.agent-settings.json` and fall back to `.env` defaults.
+
+**Supported Providers**: OpenAI, Anthropic, Google, Mistral, LiteLLM, Ollama, Custom
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/settings/llm` | Get LLM configurations for all agents |
+| `PUT /api/settings/llm/:agentId` | Update LLM config for a specific agent |
+| `POST /api/settings/llm/test` | Test an LLM connection before saving |
+| `GET /api/settings/providers` | List all supported provider presets |
